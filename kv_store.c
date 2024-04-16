@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "ring_buffer.h"
 
 typedef struct HashNode {
@@ -88,24 +90,30 @@ int get(key_type k) {
 */
 int init_server() {
 
-        int shm_size = sizeof(struct ring) + sizeof(struct buffer_descriptor);
-       //    num_threads * win_size * sizeof(struct buffer_descriptor);
-
-        int fd = shm_open("shmem_file", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+       int fd = shm_open("shmem_file", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
         
-        if (fd < 0)
-                perror("open");
+        if (fd < 0) {
+        	perror("open");
+		}
 
+		struct stat * buf;
+		fstat(fd, buf);
+		int shm_size = buf->st_size;
+		printf("shm_size %d\n", shm_size);
         char *mem = mmap(NULL, shm_size, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
-        if (mem == (void *)-1)
-                perror("mmap");
-
+        if (mem == (void *)-1) {
+         	perror("mmap");
+         }
+		
         /* mmap dups the fd, no longer needed */
         close(fd);
 
         memset(mem, 0, shm_size);
+        
         ring = (struct ring *)mem;
+       
         shmem_area = mem;
+        
 
 }
 
@@ -140,7 +148,7 @@ static int parse_args(int argc, char **argv) {
 */
 void *thread_function(void *arg) {
     struct thread_context *ctx = arg;
-
+	printf("tid %d\n", ctx->tid);
     // TODO infinite loop to fetch requests from buffer using ring_get
 }
 
@@ -151,16 +159,19 @@ void *thread_function(void *arg) {
 void start_threads() {
     for (int i = 0; i < num_threads; i++) {
 	    contexts[i].tid = i;
-        if (pthread_create(&threads[i], NULL, &thread_function, &contexts[i]))
-                perror("pthread_create");
+        if (pthread_create(&threads[i], NULL, &thread_function, &contexts[i])) {
+        	perror("pthread_create");
         }
+    }
 }
 
 
 void wait_for_threads() {
-    for (int i = 0; i < num_threads; i++)
-        if (pthread_join(threads[i], NULL))
+    for (int i = 0; i < num_threads; i++) {
+        if (pthread_join(threads[i], NULL)) {
         	perror("pthread_join");
+        }
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -174,8 +185,9 @@ int main(int argc, char *argv[]) {
 	}
 	
 	// TODO get shared memory... init_server();
+	init_server();
 
 	start_threads();
 
-//	 wait_for_threads();
+//	wait_for_threads();
 }
