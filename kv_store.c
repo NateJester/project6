@@ -142,6 +142,23 @@ static int parse_args(int argc, char **argv) {
 	return 0;
 }
 
+void serve_request(struct buffer_descriptor* bd) {
+	if (bd->req_type == PUT) {
+		put(bd->k, bd->v);
+		bd->ready = 1;
+		memcpy(shmem_area + bd->res_off, bd, sizeof(*bd));
+	}
+	if (bd->req_type == GET) {		
+		int value = get(bd->k);
+		struct buffer_descriptor *newbd;
+		newbd->k = bd->k;
+		newbd->v = value;
+		newbd->ready = 1;
+		newbd->res_off = bd->res_off;
+		memcpy(shmem_area + bd->res_off, newbd, sizeof(*newbd));
+	}
+}
+
 /*
  * Function that's run by each thread
  * @param arg context for this thread
@@ -149,6 +166,11 @@ static int parse_args(int argc, char **argv) {
 void *thread_function(void *arg) {
     struct thread_context *ctx = arg;
 	printf("tid %d\n", ctx->tid);
+	while(1) {
+		struct buffer_descriptor* bd;
+		ring_get(ring, bd);
+		serve_request(bd);
+	}
     // TODO infinite loop to fetch requests from buffer using ring_get
 }
 
@@ -188,6 +210,4 @@ int main(int argc, char *argv[]) {
 	init_server();
 
 	start_threads();
-
-//	wait_for_threads();
 }
