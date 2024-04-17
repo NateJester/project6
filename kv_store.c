@@ -15,8 +15,8 @@ typedef struct HashNode {
 	struct HashNode * next;
 } HashNode_t;
 
-HashNode_t* hashtable[128];
-pthread_mutex_t mutex[128];
+HashNode_t** hashtable;
+pthread_mutex_t* mutex;
 int hash_size = 4;
 
 struct thread_context {
@@ -123,7 +123,7 @@ int init_server() {
 */
 static int parse_args(int argc, char **argv) {
 	int op;
-	while ((op = getopt(argc, argv, "n:s:")) != -1) {
+	while ((op = getopt(argc, argv, "n:s:v")) != -1) {
 		switch (op) {
 			
 	        case 'n':
@@ -132,6 +132,10 @@ static int parse_args(int argc, char **argv) {
 	        
 	        case 's':
 	        hash_size = atoi(optarg);
+	        break;
+
+	        case 'v':
+	        printf("-v used");
 	        break;
 	        
 	        default:
@@ -146,8 +150,9 @@ void serve_request(struct buffer_descriptor* bd) {
 	if (bd->req_type == PUT) {
 		put(bd->k, bd->v);
 		bd->ready = 1;
-		memcpy(shmem_area + bd->res_off, bd, sizeof(*bd));
+		memcpy(shmem_area + bd->res_off, bd, sizeof(struct buffer_descriptor));
 	}
+	
 	if (bd->req_type == GET) {		
 		int value = get(bd->k);
 		struct buffer_descriptor *newbd;
@@ -155,7 +160,7 @@ void serve_request(struct buffer_descriptor* bd) {
 		newbd->v = value;
 		newbd->ready = 1;
 		newbd->res_off = bd->res_off;
-		memcpy(shmem_area + bd->res_off, newbd, sizeof(*newbd));
+		memcpy(shmem_area + bd->res_off, newbd, sizeof(struct buffer_descriptor));
 	}
 }
 
@@ -197,10 +202,10 @@ void wait_for_threads() {
 }
 
 int main(int argc, char *argv[]) {
-
 	if (parse_args(argc, argv) != 0) {
 	    exit(EXIT_FAILURE);
 	}
+	hashtable = calloc(hash_size, sizeof(HashNode_t));
 	// initialize locks for each hash index
 	for (int i = 0; i < hash_size; i++) {
 		pthread_mutex_init(&mutex[i], NULL);

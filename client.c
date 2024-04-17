@@ -298,7 +298,7 @@ void process_completions(struct thread_context *ctx, int *last_completed, int *l
 			ctx->nxt_comp = (ctx->nxt_comp + 1) % ctx->win_size;
 			PRINTV("LC=%d\n", *last_completed);
 		}
-		else
+		else 
 			break;
 	}
 }

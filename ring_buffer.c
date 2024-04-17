@@ -24,7 +24,7 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd) {
 	while (1) {
 		c_tail = r->c_tail;
 		p_head = r->p_head;
-		while (p_head >= c_tail) {
+		while (p_head >= c_tail + RING_SIZE) {
 		}
 		if (atomic_compare_exchange_strong(&r->p_head, &p_head, p_head + 1)) {
 			break;
@@ -48,7 +48,7 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd) {
 	while (1) {
 		c_head = r->c_head;
 		p_tail = r->p_tail;
-		while (c_head == p_tail) {
+		while (c_head >= p_tail) {
 		}
 		if (atomic_compare_exchange_strong(&r->c_head, &c_head, c_head + 1)) {
 			break;
