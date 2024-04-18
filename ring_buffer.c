@@ -17,6 +17,7 @@ int init_ring(struct ring *r) {
 
 void ring_submit(struct ring *r, struct buffer_descriptor *bd) {
 	if (r == NULL || bd == NULL) {
+		printf("r or bd was null for ring_submit");
 		return;
 	}
 	uint32_t c_tail;
@@ -24,13 +25,13 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd) {
 	while (1) {
 		c_tail = r->c_tail;
 		p_head = r->p_head;
-		while (p_head >= c_tail + RING_SIZE) {
-		}
-		if (atomic_compare_exchange_strong(&r->p_head, &p_head, p_head + 1)) {
-			break;
+		if (p_head - c_tail < RING_SIZE) {	
+			if (atomic_compare_exchange_strong(&r->p_head, &p_head, p_head + 1)) {
+				break;
+			}
 		}
 	}
-	memcpy(&r->buffer[p_head % RING_SIZE], bd, sizeof(*bd));
+	memcpy(&r->buffer[p_head % RING_SIZE], bd, sizeof(struct buffer_descriptor));
 	while (1) {
 		if (r->p_tail == p_head) {
 			r->p_tail = r->p_tail + 1;
@@ -41,20 +42,22 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd) {
 
 void ring_get(struct ring *r, struct buffer_descriptor *bd) {
 	if (r == NULL || bd == NULL) {
+		printf("r or bd was null for ring_get");
 		return;
 	}
+	printf("ring_get");
 	uint32_t p_tail;
 	uint32_t c_head;
 	while (1) {
 		c_head = r->c_head;
 		p_tail = r->p_tail;
-		while (c_head >= p_tail) {
-		}
-		if (atomic_compare_exchange_strong(&r->c_head, &c_head, c_head + 1)) {
-			break;
+		if (p_tail > c_head) {
+			if (atomic_compare_exchange_strong(&r->c_head, &c_head, c_head + 1)) {
+				break;
+			}
 		}
 	}
-	memcpy(bd, &r->buffer[c_head % RING_SIZE], sizeof(*bd));
+	memcpy(bd, &r->buffer[c_head % RING_SIZE], sizeof(struct buffer_descriptor));
 	while (1) {
 		if(r->c_tail == c_head) {
 			r->c_tail = r->c_tail + 1;
