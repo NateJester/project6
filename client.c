@@ -324,7 +324,7 @@ void *thread_function(void *arg) {
 	PRINTV("Done with subs\n");
 	/* There might be some completions still in flight */
 	while (last_completed < ctx->num_reqs)
-		process_completions(ctx, &last_completed, &last_submitted);
+			process_completions(ctx, &last_completed, &last_submitted);
 }
 
 /*

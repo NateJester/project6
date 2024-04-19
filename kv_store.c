@@ -17,7 +17,7 @@ typedef struct HashNode {
 
 HashNode_t** hashtable;
 pthread_mutex_t* mutex;
-int hash_size = 10;
+int hash_size;
 
 struct thread_context {
 	int tid;
@@ -38,10 +38,8 @@ char shm_file[] = "shmem_file";
 int put(key_type k, value_type v) {
 	
 	int index = hash_function(k, hash_size);
-	printf("put");
 	
 	pthread_mutex_lock(&mutex[index]);
-	
 	HashNode_t * temp = hashtable[index];
 	if(hashtable[index] != NULL) {
 		while (temp->next != NULL && temp->k != k) {
@@ -49,6 +47,8 @@ int put(key_type k, value_type v) {
 		}
 		if (temp->k == k) {
 			temp->v = v;
+			pthread_mutex_unlock(&mutex[index]);
+			return 0;
 		}
 	} 
 	HashNode_t * newNode = malloc(sizeof(HashNode_t));
@@ -57,6 +57,7 @@ int put(key_type k, value_type v) {
 	newNode->next = NULL;
 	
 	if (hashtable[index] == NULL) {
+		printf("new bucket");
 		hashtable[index] = newNode;
 	} else {
 		HashNode_t * temp = hashtable[index];
@@ -77,12 +78,12 @@ int put(key_type k, value_type v) {
 int get(key_type k) {
 	int index = hash_function(k, hash_size);
 	int value = 0;
-	printf("get");
 	
 	HashNode_t * temp = hashtable[index];
 	while (temp != NULL) {
 		if (temp->k == k) {
 			value = temp->v;
+			return value;
 		}
 		temp = temp->next;
 	}
@@ -153,13 +154,15 @@ static int parse_args(int argc, char **argv) {
 void serve_request(struct buffer_descriptor* bd) {
 	if (bd->req_type == PUT) {
 		put(bd->k, bd->v);
+		printf("key: %u", bd->k);
+		printf("value: %u", bd->v);
 		bd->ready = 1;
 		memcpy((struct buffer_descriptor *) (shmem_area + bd->res_off), bd, sizeof(struct buffer_descriptor));
 	}
 	
 	if (bd->req_type == GET) {		
-		int value = get(bd->k);
-		bd->v = value;
+		bd->v = get(bd->k);
+		printf("value: %u", bd->v);
 		bd->ready = 1;
 		memcpy((struct buffer_descriptor *) (shmem_area + bd->res_off), bd, sizeof(struct buffer_descriptor));
 	}
@@ -172,11 +175,12 @@ void serve_request(struct buffer_descriptor* bd) {
 void *thread_function(void *arg) {
     struct thread_context *ctx = arg;
 	printf("tid %d\n", ctx->tid);
-	printf("got to thread_function");
-	struct buffer_descriptor* bd;
+	struct buffer_descriptor bd;
 	while(1) {
-		ring_get(ring, bd);
-		serve_request(bd);
+		printf("before ring get");
+		ring_get(ring, &bd);
+		printf("after ring get");
+		serve_request(&bd);
 	}
 }
 
